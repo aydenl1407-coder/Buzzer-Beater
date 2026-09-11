@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Buzzer Beater</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Arial, sans-serif;
+  }
+
+  body {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #game {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .side {
+    flex: 1 1 50%;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: clamp(36px, 8vw, 100px);
+    font-weight: 800;
+    letter-spacing: -2px;
+    transition: background 0.08s ease, filter 0.08s ease;
+    position: relative;
+    cursor: pointer;
+  }
+
+  #left {
+    background: #25304a;
+    border-right: 3px solid rgba(255,255,255,0.16);
+  }
+
+  #right {
+    background: #3b2a49;
+  }
+
+  .side .label {
+    opacity: 0.95;
+    text-shadow: 0 3px 10px rgba(0,0,0,0.25);
+    pointer-events: none;
+  }
+
+  .side.winner {
+    filter: saturate(1.25) brightness(1.12);
+  }
+
+  #left.winner { background: #16a34a; }
+  #right.winner { background: #dc2626; }
+
+  .side.loser {
+    filter: brightness(0.4) saturate(0.35);
+  }
+
+  #middle {
+    position: absolute;
+    left: 50%;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 8;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  button {
+    pointer-events: auto;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(20,20,20,0.84);
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 12px 18px;
+    box-shadow: 0 5px 18px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  button:active { transform: scale(0.96); }
+
+  #status {
+    position: absolute;
+    top: max(18px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9;
+    color: rgba(255,255,255,0.92);
+    background: rgba(0,0,0,0.45);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+  }
+
+  #winnerText {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    color: white;
+    font-size: clamp(26px, 7vw, 62px);
+    font-weight: 900;
+    text-shadow: 0 5px 18px rgba(0,0,0,0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s ease;
+  }
+
+  #winnerText.show { opacity: 1; }
+
+  #flash {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    background: white;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+
+  #fullscreen {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    left: max(14px, env(safe-area-inset-left));
+    z-index: 10;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  #editNames {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+    z-index: 10;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  #nameEditor {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 24px;
+  }
+
+  #nameEditor.show { display: flex; }
+
+  .panel {
+    width: min(420px, 92vw);
+    background: #202020;
+    color: white;
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  }
+
+  .panel h2 { margin: 0 0 16px; font-size: 24px; }
+  .field { margin: 12px 0; }
+  .field label { display:block; font-size:13px; opacity:.72; margin-bottom:7px; }
+  .field input {
+    width:100%; padding:12px 14px; border:1px solid #444; border-radius:12px;
+    background:#111; color:white; font-size:17px; outline:none;
+  }
+  .panelActions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+  .panelActions button { background:#3a3a3a; }
+
+  @media (orientation: portrait) {
+    .side { min-width: 50%; }
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="left" class="side" data-player="LEFT">
+    <div class="label">LEFT</div>
+  </div>
+
+  <div id="right" class="side" data-player="RIGHT">
+    <div class="label">RIGHT</div>
+  </div>
+
+  <div id="status">TAP YOUR SIDE</div>
+  <button id="fullscreen" aria-label="Enter fullscreen">⛶</button>
+  <button id="editNames">NAMES</button>
+  <div id="winnerText"></div>
+  <div id="flash"></div>
+
+  <div id="middle">
+    <button id="reset">RESET</button>
+  </div>
+
+  <div id="nameEditor" aria-hidden="true">
+    <div class="panel">
+      <h2>Player names</h2>
+      <div class="field">
+        <label for="leftName">Left player</label>
+        <input id="leftName" maxlength="18" value="LEFT">
+      </div>
+      <div class="field">
+        <label for="rightName">Right player</label>
+        <input id="rightName" maxlength="18" value="RIGHT">
+      </div>
+      <div class="panelActions">
+        <button id="cancelNames">CANCEL</button>
+        <button id="saveNames">SAVE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const left = document.getElementById('left');
+  const right = document.getElementById('right');
+  const status = document.getElementById('status');
+  const winnerText = document.getElementById('winnerText');
+  const reset = document.getElementById('reset');
+  const fullscreen = document.getElementById('fullscreen');
+  const editNames = document.getElementById('editNames');
+  const nameEditor = document.getElementById('nameEditor');
+  const leftName = document.getElementById('leftName');
+  const rightName = document.getElementById('rightName');
+  const saveNames = document.getElementById('saveNames');
+  const cancelNames = document.getElementById('cancelNames');
+  const flash = document.getElementById('flash');
+
+  let locked = false;
+
+  function vibrate() {
+    try {
+      if (navigator.vibrate) navigator.vibrate([35, 25, 60]);
+    } catch (_) {}
+  }
+
+  function win(side, player) {
+    if (locked) return;
+    locked = true;
+
+    side.classList.add('winner');
+    const other = side === left ? right : left;
+    other.classList.add('loser');
+
+    status.textContent = player.toUpperCase() + ' PRESSED FIRST';
+    winnerText.textContent = player;
+    winnerText.classList.add('show');
+
+    flash.style.opacity = '0.28';
+    setTimeout(() => flash.style.opacity = '0', 110);
+    vibrate();
+  }
+
+  function resetGame() {
+    locked = false;
+    left.classList.remove('winner', 'loser');
+    right.classList.remove('winner', 'loser');
+    status.textContent = 'TAP YOUR SIDE';
+    winnerText.textContent = '';
+    winnerText.classList.remove('show');
+  }
+
+  // pointerdown gives the earliest reliable input across touch and mouse.
+  left.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    win(left, leftName.value || 'LEFT');
+  }, {passive:false});
+
+  right.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    win(right, rightName.value || 'RIGHT');
+  }, {passive:false});
+
+  reset.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    resetGame();
+  }, {passive:false});
+
+  fullscreen.addEventListener('pointerdown', async e => {
+    e.preventDefault();
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (_) {}
+  }, {passive:false});
+
+  editNames.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    nameEditor.classList.add('show');
+    nameEditor.setAttribute('aria-hidden', 'false');
+    setTimeout(() => leftName.focus(), 50);
+  }, {passive:false});
+
+  cancelNames.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    nameEditor.classList.remove('show');
+    nameEditor.setAttribute('aria-hidden', 'true');
+  }, {passive:false});
+
+  saveNames.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    left.querySelector('.label').textContent = leftName.value.trim() || 'LEFT';
+    right.querySelector('.label').textContent = rightName.value.trim() || 'RIGHT';
+    nameEditor.classList.remove('show');
+    nameEditor.setAttribute('aria-hidden', 'true');
+    resetGame();
+  }, {passive:false});
+
+  // Prevent accidental browser gestures.
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('gesturechange', e => e.preventDefault());
+  document.addEventListener('gestureend', e => e.preventDefault());
+
+  // Keyboard support for testing on a computer.
+  document.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() === 'a') win(left, leftName.value || 'LEFT');
+    if (e.key.toLowerCase() === 'l') win(right, rightName.value || 'RIGHT');
+    if (e.key === ' ') resetGame();
+  });
+})();
+</script>
+</body>
+</html>
